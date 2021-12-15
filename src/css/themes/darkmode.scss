@@ -1,0 +1,19 @@
+#contenedor {
+    background: rgb(32, 32, 32);
+}
+
+#q-item {
+    background-color: rgb(25, 25, 25);
+    color: white;
+    .q-checkbox__bg {
+        border-color: white;
+    }
+}
+
+#q-detail {
+    background-color: rgb(48, 44, 44);
+}
+
+#q-image {
+    filter: grayscale(100%) brightness(50%);
+}
