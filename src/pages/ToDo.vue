@@ -10,7 +10,7 @@
     </q-section>
 
     <q-list :id="darkmode ? 'q-detail' : ''" class="lista bkg-white" separator bordered>
-        <q-item v-for="task in state.tasks" :key="task.id" @click="task.completed = !task.completed" :id="darkmode ? 'q-item' : ''" :class="{ 'completed' : task.completed }" clickable v-ripple>
+        <q-item v-for="task in state.tasks" :key="task.id" @click="updateCompleted(task.id)" :id="darkmode ? 'q-item' : ''" :class="{ 'completed' : task.completed }" clickable v-ripple>
             <q-item-section avatar>
                 <q-checkbox class="no-pointer-events" :color="darkmode ? 'negative' : 'primary'" v-model="task.completed" />
             </q-item-section>
@@ -19,7 +19,11 @@
                 <q-item-label>{{ task.name }}</q-item-label>
             </q-item-section>
 
-            <q-item-section side v-if="task.completed">
+             <q-item-section side v-if="!task.completed">
+                <q-btn flat :color="darkmode ? 'negative' : 'primary'" icon="edit" :id="darkmode ? 'q-detail' : ''" class="bkg-white" @click.stop="updateTask(task.id)" />
+            </q-item-section>
+
+            <q-item-section side v-else>
                 <q-btn flat :color="darkmode ? 'negative' : 'primary'" icon="delete" :id="darkmode ? 'q-detail' : ''" class="bkg-white" @click.stop="deleteTask(task.id)" />
             </q-item-section>
         </q-item>
@@ -35,12 +39,18 @@
 
 <script>
 import {
+    db
+} from "boot/firebase"
+import {
     defineComponent,
     reactive
 } from 'vue'
 import {
     useQuasar
 } from 'quasar'
+import {
+    onMounted
+} from 'vue'
 
 export default defineComponent({
     name: 'ToDo',
@@ -58,7 +68,25 @@ export default defineComponent({
             tasks: []
         });
 
-        function addTask() {
+        onMounted(async () => {
+            try {
+                const response = await db.collection('task').get();
+
+                response.forEach(r => {
+                    let task = {
+                        id: r.id,
+                        name: r.data().name,
+                        completed: r.data().completed
+                    }
+                    state.tasks.push(task);
+                });
+
+            } catch (error) {
+                console.log(error)
+            }
+        })
+
+        async function addTask() {
 
             if (state.newTask.trim() == '') {
                 $q.notify({
@@ -68,16 +96,31 @@ export default defineComponent({
                 return;
             }
 
-            state.tasks.push({
-                id: state.tasks.length + 1,
-                name: state.newTask,
-                completed: false
-            });
-            state.newTask = '';
-            $q.notify({
-                message: 'Task Added',
-                color: props.darkmode ? 'negative' : 'primary'
-            })
+            try {
+                const response = await db.collection('task').add({
+                    name: state.newTask,
+                    completed: false
+                });
+
+                state.tasks.push({
+                    id: response.id,
+                    name: state.newTask,
+                    completed: false
+                });
+
+                state.newTask = '';
+                $q.notify({
+                    message: 'Task Added',
+                    color: props.darkmode ? 'negative' : 'primary'
+                })
+
+            } catch (error) {
+                console.log(error)
+            }
+        }
+
+        async function updateTask(id){
+
         }
 
         function deleteTask(id) {
@@ -87,19 +130,38 @@ export default defineComponent({
                 color: props.darkmode ? 'negative' : 'primary',
                 cancel: true,
                 persistent: true
-            }).onOk(() => {
-                state.tasks = state.tasks.filter(task => task.id !== id);
-                $q.notify({
-                    message: 'Task deleted',
-                    color: props.darkmode ? 'negative' : 'primary'
-                })
+            }).onOk(async () => {
+
+                try {
+
+                    await db.collection('task').doc(id).delete();
+                    state.tasks = state.tasks.filter(task => task.id !== id);
+                    $q.notify({
+                        message: 'Task deleted',
+                        color: props.darkmode ? 'negative' : 'primary'
+                    })
+
+                } catch (error) {
+                    console.log(error)
+                }
+
+            })
+        }
+
+        async function updateCompleted(id) {
+            let task = state.tasks.find(task => task.id === id);
+            task.completed = !task.completed;
+
+            await db.collection('task').doc(id).update({
+                completed: task.completed
             })
         }
 
         return {
             state,
             addTask,
-            deleteTask
+            deleteTask,
+            updateCompleted
         }
 
     }
